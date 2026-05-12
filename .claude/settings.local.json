@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(conda --version)",
+      "Bash(where conda *)",
+      "PowerShell(Get-Command conda -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Source; if \\(-not $?\\) { Write-Output \"NO_CONDA\" }; Get-ChildItem \"$env:USERPROFILE\\\\miniconda3\\\\Scripts\\\\conda.exe\",\"$env:USERPROFILE\\\\anaconda3\\\\Scripts\\\\conda.exe\",\"C:\\\\ProgramData\\\\miniconda3\\\\Scripts\\\\conda.exe\",\"C:\\\\ProgramData\\\\anaconda3\\\\Scripts\\\\conda.exe\" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName })",
+      "PowerShell(& \"C:\\\\Users\\\\USER\\\\miniconda3\\\\Scripts\\\\conda.exe\" env list)",
+      "PowerShell($zip = \"C:\\\\Users\\\\USER\\\\Downloads\\\\augmented_dataset-20260511T122321Z-3-001.zip\"; $out = \"C:\\\\Users\\\\USER\\\\Desktop\\\\final_proj_digital_image\\\\dataset\"; if \\(-not \\(Test-Path $out\\)\\) { New-Item -ItemType Directory -Path $out | Out-Null }; Expand-Archive -Path $zip -DestinationPath $out -Force; Get-ChildItem $out -Recurse -Directory | Select-Object -First 10 FullName)",
+      "Bash(curl -s http://localhost:5000/health)",
+      "PowerShell(Add-Type -AssemblyName System.IO.Compression.FileSystem; $zip = [System.IO.Compression.ZipFile]::OpenRead\\(\"C:\\\\Users\\\\USER\\\\Downloads\\\\archive.zip\"\\); $dirs = $zip.Entries | ForEach-Object { Split-Path $_.FullName -Parent } | Sort-Object -Unique; \"DIRECTORIES:\"; $dirs -join \"`n\"; \"---\"; \"SAMPLE FILES:\"; $zip.Entries | Select-Object -First 5 FullName | ForEach-Object { $_.FullName }; \"---\"; \"Total entries: $\\($zip.Entries.Count\\)\"; $zip.Dispose\\(\\))",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5000/health)",
+      "Bash(curl -s -m 2 http://127.0.0.1:5000/health)",
+      "Bash(tasklist /FI \"PID eq 29592\")",
+      "Bash(netstat -ano)",
+      "Bash(curl -s -m 3 http://127.0.0.1:5000/health -w \"\\\\nHTTP=%{http_code}\\\\n\")",
+      "Bash(curl -s -m 3 http://localhost:5000/health -w \"\\\\nHTTP=%{http_code}\\\\n\")",
+      "Bash(tasklist /v)",
+      "Bash(tasklist)"
+    ]
+  }
+}

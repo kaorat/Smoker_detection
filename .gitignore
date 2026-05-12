@@ -1,0 +1,58 @@
+# ── Dataset (large, not for git) ──────────────────────────────────────────────
+dataset/
+dataset_val/
+dataset_test/
+_archive_extract/
+*.zip
+
+# ── Trained model weights (large binary files) ────────────────────────────────
+models/
+*.pkl
+*.pth
+*.pt
+*.safetensors
+
+# ── Training outputs / logs ───────────────────────────────────────────────────
+*.log
+*.err
+eval_plots/
+output/
+eval_results/
+runs/
+lightning_logs/
+wandb/
+
+# ── Python ────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# ── Virtual envs (the conda env lives outside the repo, but just in case) ─────
+venv/
+env/
+.venv/
+.env
+
+# ── Jupyter ───────────────────────────────────────────────────────────────────
+.ipynb_checkpoints/
+
+# ── Hugging Face / Torch / ML caches (usually in user home, not repo) ─────────
+.cache/
+.huggingface/
+
+# ── IDE / editor ──────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

@@ -78,7 +78,7 @@ python predict.py --model classical --input ./test_images/
 ## 5. Run the web app (both models live)
 
 ```powershell
-python app.py
+python app.py --enable_dino
 ```
 
 Then open http://localhost:5000. The UI lets you switch between

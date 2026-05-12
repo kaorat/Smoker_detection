@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smoke Detect — Dual</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;700;800&family=DM+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0d0d0f;
+    --surface:   #141416;
+    --surface2:  #1a1a22;
+    --border:    #242428;
+    --muted:     #3a3a40;
+    --text:      #f0f0f0;
+    --sub:       #888;
+    --smoke:     #e63946;
+    --safe:      #3fba74;
+    --amber:     #f4a261;
+    --accent:    #c77dff;
+    --accent2:   #5cc8ff;
+    --mono:      'DM Mono', monospace;
+    --sans:      'Syne', sans-serif;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 999;
+    opacity: .4;
+  }
+
+  .shell {
+    min-height: 100vh;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 0 24px;
+  }
+
+  /* ── header ── */
+  header {
+    padding: 36px 0 22px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    flex-wrap: wrap;
+  }
+  .logo {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+  .logo span { color: var(--smoke); }
+  .tag {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--sub);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 4px;
+    letter-spacing: .04em;
+  }
+  .status-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--muted);
+    margin-left: auto;
+    transition: background .4s;
+  }
+  .status-dot.online {
+    background: var(--safe);
+    box-shadow: 0 0 8px var(--safe);
+    animation: pulse 2.5s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 4px var(--safe); }
+    50%      { box-shadow: 0 0 14px var(--safe); }
+  }
+
+  /* ── model toggle ── */
+  .model-toggle {
+    display: flex;
+    gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 4px;
+    margin: 18px 0 6px;
+    font-family: var(--mono);
+    width: max-content;
+  }
+  .model-toggle button {
+    background: transparent;
+    border: 0;
+    color: var(--sub);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 8px 14px;
+    border-radius: 7px;
+    cursor: pointer;
+    transition: background .2s, color .2s;
+    letter-spacing: .04em;
+  }
+  .model-toggle button.active {
+    background: var(--surface2);
+    color: var(--text);
+  }
+  .model-toggle button.disabled {
+    opacity: .35; cursor: not-allowed;
+  }
+
+  /* ── main ── */
+  main {
+    padding: 12px 0 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+  }
+
+  /* ── drop zone ── */
+  .drop-zone {
+    border: 1.5px dashed var(--muted);
+    border-radius: 14px;
+    padding: 56px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: border-color .2s, background .2s;
+    position: relative;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .drop-zone:hover, .drop-zone.drag-over {
+    border-color: var(--accent);
+    background: var(--surface2);
+  }
+  .drop-zone input[type=file] {
+    position: absolute; inset: 0;
+    opacity: 0; cursor: pointer;
+    width: 100%; height: 100%;
+  }
+  .drop-icon { font-size: 40px; margin-bottom: 14px; display: block; opacity: .7; }
+  .drop-title { font-size: 17px; font-weight: 700; margin-bottom: 6px; }
+  .drop-sub { font-family: var(--mono); font-size: 12px; color: var(--sub); }
+
+  /* ── result row: preview + (1 or 2 verdict cards) ── */
+  .result-row {
+    display: grid;
+    grid-template-columns: 280px 1fr;
+    gap: 20px;
+    opacity: 0;
+    transform: translateY(12px);
+    transition: opacity .35s, transform .35s;
+    pointer-events: none;
+  }
+  .result-row.visible { opacity: 1; transform: none; pointer-events: auto; }
+
+  .preview-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    aspect-ratio: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .preview-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+  .verdict-grid { display: grid; gap: 16px; }
+  .verdict-grid.dual { grid-template-columns: 1fr 1fr; }
+  .verdict-grid.triple { grid-template-columns: 1fr 1fr 1fr; }
+  @media (max-width: 980px) { .verdict-grid.triple { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 680px) { .verdict-grid.triple { grid-template-columns: 1fr; } }
+
+  .verdict-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 22px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: relative;
+  }
+  .verdict-card .badge {
+    position: absolute;
+    top: 14px; right: 14px;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sub);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 3px 8px;
+    border-radius: 5px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .verdict-card .badge.resnet    { color: var(--accent2); border-color: #1b4356; }
+  .verdict-card .badge.classical { color: var(--amber);   border-color: #4a361b; }
+  .verdict-card .badge.dino      { color: var(--accent);  border-color: #432356; }
+
+  .overlay-wrap {
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    margin-top: 12px;
+  }
+  .overlay-wrap img { width: 100%; display: block; }
+  .overlay-caption {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sub);
+    padding: 6px 10px;
+    border-top: 1px solid var(--border);
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .detections {
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--sub);
+    margin-top: 4px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .det-chip {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 3px 7px;
+  }
+  .det-chip b { color: var(--text); }
+
+  .verdict-label {
+    font-size: 11px;
+    font-family: var(--mono);
+    color: var(--sub);
+    text-transform: uppercase;
+    letter-spacing: .1em;
+    margin-bottom: 6px;
+  }
+  .verdict-main {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    transition: color .3s;
+  }
+  .verdict-main.smoking    { color: var(--smoke); }
+  .verdict-main.not_smoking { color: var(--safe); }
+  .verdict-main.error      { color: var(--sub); font-size: 16px; }
+
+  .conf-row { display: flex; flex-direction: column; gap: 8px; }
+  .bar-label {
+    display: flex;
+    justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--sub);
+  }
+  .bar-track { height: 5px; background: var(--muted); border-radius: 99px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 99px; width: 0%; transition: width .6s cubic-bezier(.22,1,.36,1); }
+  .bar-fill.smoking { background: var(--smoke); }
+  .bar-fill.not_smoking { background: var(--safe); }
+
+  .meta-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .meta-pill {
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--sub);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 3px 8px;
+  }
+  .meta-pill b { color: var(--text); }
+
+  .agreement-banner {
+    display: none;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 16px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--sub);
+    letter-spacing: .04em;
+  }
+  .agreement-banner.show { display: block; }
+  .agreement-banner.agree { border-color: #1f4d33; color: #98e0b0; }
+  .agreement-banner.disagree { border-color: #4d1f1f; color: #e09898; }
+
+  .error-banner {
+    background: #2a1014;
+    border: 1px solid #5a1a20;
+    color: #f87171;
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-family: var(--mono);
+    font-size: 13px;
+    display: none;
+  }
+  .error-banner.show { display: block; }
+
+  .spinner {
+    width: 24px; height: 24px;
+    border: 2.5px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin .7s linear infinite;
+    display: none;
+    margin: 0 auto;
+  }
+  .spinner.show { display: block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  footer {
+    padding: 20px 0 28px;
+    border-top: 1px solid var(--border);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--muted);
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  @media (max-width: 760px) {
+    .result-row { grid-template-columns: 1fr; }
+    .verdict-grid.dual { grid-template-columns: 1fr; }
+    .preview-wrap { aspect-ratio: 16/9; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header>
+    <div class="logo"><span>smoke</span>detect</div>
+    <div class="tag">resnet50 · hog+lbp+svm</div>
+    <div class="status-dot" id="statusDot" title="checking server..."></div>
+  </header>
+
+  <main>
+
+    <div class="model-toggle" id="modelToggle">
+      <button data-model="all"       class="active">ALL</button>
+      <button data-model="resnet">RESNET-50</button>
+      <button data-model="classical">CLASSICAL</button>
+      <button data-model="dino">DINO+SAM</button>
+    </div>
+
+    <div class="drop-zone" id="dropZone">
+      <input type="file" id="fileInput" accept="image/*">
+      <span class="drop-icon">🖼</span>
+      <div class="drop-title">Drop an image or click to browse</div>
+      <div class="drop-sub">jpg · png · webp · bmp &nbsp;|&nbsp; max 10 MB</div>
+    </div>
+
+    <div class="spinner" id="spinner"></div>
+    <div class="error-banner" id="errorBanner"></div>
+    <div class="agreement-banner" id="agreementBanner"></div>
+
+    <div class="result-row" id="resultRow">
+      <div class="preview-wrap">
+        <img id="previewImg" src="" alt="preview">
+      </div>
+      <div class="verdict-grid" id="verdictGrid">
+        <!-- cards injected here -->
+      </div>
+    </div>
+
+  </main>
+
+  <footer>
+    <span>classical + deep learning · trained on augmented dataset</span>
+    <span id="footerInfo">models: —</span>
+  </footer>
+
+</div>
+
+<script>
+const API = '';   // same origin
+
+let CURRENT_MODEL = 'all';   // all | resnet | classical | dino
+let SERVER_MODELS = { classical: null, resnet: null, dino: null };
+
+// ── health ────────────────────────────────────────────────────────────────────
+async function checkHealth() {
+  try {
+    const r = await fetch(`${API}/health`);
+    const d = await r.json();
+    SERVER_MODELS = d.models || {};
+    if (d.status === 'ok') {
+      document.getElementById('statusDot').classList.add('online');
+    }
+    const bits = [];
+    if (SERVER_MODELS.resnet)    bits.push(`resnet (${SERVER_MODELS.resnet.device || 'cpu'})`);
+    if (SERVER_MODELS.classical) bits.push(`classical (pca=${SERVER_MODELS.classical.pca_components})`);
+    if (SERVER_MODELS.dino)      bits.push(`dino+sam (${SERVER_MODELS.dino.device || 'cpu'})`);
+    document.getElementById('footerInfo').textContent = 'models: ' + (bits.join(' · ') || 'none');
+
+    // Disable toggle buttons whose model isn't loaded
+    document.querySelectorAll('#modelToggle button').forEach(btn => {
+      const m = btn.dataset.model;
+      if (m === 'resnet'    && !SERVER_MODELS.resnet)    btn.classList.add('disabled');
+      if (m === 'classical' && !SERVER_MODELS.classical) btn.classList.add('disabled');
+      if (m === 'dino'      && !SERVER_MODELS.dino)      btn.classList.add('disabled');
+    });
+  } catch { /* offline */ }
+}
+checkHealth();
+
+// ── model toggle ──────────────────────────────────────────────────────────────
+document.getElementById('modelToggle').addEventListener('click', e => {
+  const btn = e.target.closest('button');
+  if (!btn || btn.classList.contains('disabled')) return;
+  document.querySelectorAll('#modelToggle button').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  CURRENT_MODEL = btn.dataset.model;
+});
+
+// ── drag-and-drop ─────────────────────────────────────────────────────────────
+const dropZone  = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover',  e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => {
+  e.preventDefault();
+  dropZone.classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) handleFile(file);
+});
+fileInput.addEventListener('change', () => {
+  if (fileInput.files[0]) handleFile(fileInput.files[0]);
+});
+
+document.addEventListener('paste', e => {
+  const item = [...e.clipboardData.items].find(i => i.type.startsWith('image/'));
+  if (item) handleFile(item.getAsFile());
+});
+
+// ── main handler ──────────────────────────────────────────────────────────────
+async function handleFile(file) {
+  hideError();
+  hideAgreement();
+
+  const dataUrl = await readAsDataURL(file);
+  document.getElementById('previewImg').src = dataUrl;
+
+  showSpinner(true);
+  document.getElementById('resultRow').classList.remove('visible');
+
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    const resp = await fetch(`${API}/predict?model=${CURRENT_MODEL}`, { method: 'POST', body: formData });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || `HTTP ${resp.status}`);
+    }
+    const data = await resp.json();
+    renderResult(dataUrl, data);
+  } catch (err) {
+    showError(err.message || 'Prediction failed');
+  } finally {
+    showSpinner(false);
+  }
+}
+
+// ── render ────────────────────────────────────────────────────────────────────
+function renderResult(dataUrl, data) {
+  document.getElementById('previewImg').src = dataUrl;
+  const grid = document.getElementById('verdictGrid');
+  grid.innerHTML = '';
+  grid.classList.remove('dual', 'triple');
+
+  if (CURRENT_MODEL === 'all') {
+    const m = data.models || {};
+    // Count how many models actually ran (excluding errors-only)
+    const keys = ['resnet', 'classical', 'dino'].filter(k => m[k] && !(m[k].error && Object.keys(m[k]).length === 1));
+    grid.classList.add(keys.length === 3 ? 'triple' : 'dual');
+
+    for (const k of ['resnet', 'classical', 'dino']) {
+      if (m[k]) grid.appendChild(buildCard(k, m[k]));
+    }
+
+    // Agreement banner — count majority label across loaded models
+    const labels = ['resnet','classical','dino']
+      .map(k => m[k]?.label).filter(Boolean);
+    if (labels.length >= 2) {
+      const banner = document.getElementById('agreementBanner');
+      const allAgree = labels.every(l => l === labels[0]);
+      if (allAgree) {
+        banner.className = 'agreement-banner agree show';
+        banner.textContent = `✓ all ${labels.length} models agree — ${labels[0]}`;
+      } else {
+        banner.className = 'agreement-banner disagree show';
+        const summary = ['resnet','classical','dino']
+          .filter(k => m[k]?.label).map(k => `${k}: ${m[k].label}`).join('  /  ');
+        banner.textContent = `! disagreement — ${summary}`;
+      }
+    }
+  } else {
+    grid.appendChild(buildCard(CURRENT_MODEL, data));
+  }
+
+  document.getElementById('resultRow').classList.add('visible');
+}
+
+function buildCard(modelKey, r) {
+  const card = document.createElement('div');
+  card.className = 'verdict-card';
+
+  const badge = document.createElement('div');
+  badge.className = `badge ${modelKey}`;
+  badge.textContent =
+    modelKey === 'resnet'    ? 'ResNet-50' :
+    modelKey === 'classical' ? 'HOG+LBP+SVM' :
+    modelKey === 'dino'      ? 'DINO + SAM' : modelKey;
+  card.appendChild(badge);
+
+  if (r.error) {
+    card.innerHTML += `
+      <div>
+        <div class="verdict-label">Prediction</div>
+        <div class="verdict-main error">${r.error}</div>
+      </div>`;
+    return card;
+  }
+
+  const label = r.label;          // 'smoking' | 'not_smoking'
+  const ps    = r.probabilities.smoking;
+  const pn    = r.probabilities.not_smoking;
+
+  if (modelKey === 'dino') {
+        card.innerHTML += `
+            <div>
+            <div class="verdict-label">Prediction</div>
+            <div class="verdict-main ${label}">${label === 'smoking' ? '🚬 Smoking' : '✅ Not Smoking'}</div>
+            </div>
+            
+            <div class="meta-row">
+            <div class="meta-pill">time <b>${r.inference_ms} ms</b></div>
+            </div>`;
+    } else {
+        card.innerHTML += `
+        <div>
+        <div class="verdict-label">Prediction</div>
+        <div class="verdict-main ${label}">${label === 'smoking' ? '🚬 Smoking' : '✅ Not Smoking'}</div>
+        </div>
+        <div class="conf-row">
+        <div>
+            <div class="bar-label"><span>🚬 smoking</span><span>${(ps * 100).toFixed(1)}%</span></div>
+            <div class="bar-track"><div class="bar-fill smoking"     style="width:0%"></div></div>
+        </div>
+        <div>
+            <div class="bar-label"><span>✅ not smoking</span><span>${(pn * 100).toFixed(1)}%</span></div>
+            <div class="bar-track"><div class="bar-fill not_smoking" style="width:0%"></div></div>
+        </div>
+        </div>
+        <div class="meta-row">
+        <div class="meta-pill">conf <b>${(r.confidence * 100).toFixed(1)}%</b></div>
+        <div class="meta-pill">time <b>${r.inference_ms} ms</b></div>
+        </div>`;
+    }
+
+  // animate bars
+  setTimeout(() => {
+    const bars = card.querySelectorAll('.bar-fill');
+    bars[0].style.width = (ps * 100) + '%';
+    bars[1].style.width = (pn * 100) + '%';
+  }, 30);
+
+  // DINO+SAM extras: detection chips + annotated overlay
+  if (modelKey === 'dino' && r.detections) {
+    const nc = r.detections.cigarettes?.length || 0;
+    const ns = r.detections.smoke?.length || 0;
+    const det = document.createElement('div');
+    det.className = 'detections';
+    det.innerHTML = `
+      <span class="det-chip">🚬 cigarettes <b>${nc}</b></span>
+      <span class="det-chip">💨 smoke <b>${ns}</b></span>`;
+    card.appendChild(det);
+  }
+  if (modelKey === 'dino' && r.overlay_b64) {
+    const wrap = document.createElement('div');
+    wrap.className = 'overlay-wrap';
+    wrap.innerHTML = `
+      <img src="data:image/png;base64,${r.overlay_b64}" alt="detection overlay">
+      <div class="overlay-caption">DINO+SAM segmentation</div>`;
+    card.appendChild(wrap);
+  }
+
+  return card;
+}
+
+// ── utils ─────────────────────────────────────────────────────────────────────
+function readAsDataURL(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result);
+    r.onerror = rej;
+    r.readAsDataURL(file);
+  });
+}
+function showSpinner(on)  { document.getElementById('spinner').classList.toggle('show', on); }
+function showError(msg)   { const b = document.getElementById('errorBanner'); b.textContent = '⚠ ' + msg; b.classList.add('show'); }
+function hideError()      { document.getElementById('errorBanner').classList.remove('show'); }
+function hideAgreement()  { document.getElementById('agreementBanner').classList.remove('show'); }
+</script>
+</body>
+</html>
